@@ -35,8 +35,8 @@ public class TtsManager {
 
     private InputWorker mWorker;
 
-    private final static String FASTSPEECH2_MODULE = "fastspeech2_quant.tflite";
-    private final static String MELGAN_MODULE = "mbmelgan.tflite";
+    private final static String FASTSPEECH2_MODULE = "TFLite_fastspeech2_quant.onnx";
+    private final static String MELGAN_MODULE = "TFlite_mbmelgan.onnx";
 
     public void init(Context context) {
         ThreadPoolManager.getInstance().getSingleExecutor("init").execute(() -> {
