@@ -28,7 +28,10 @@ public class MBMelGan {
 
     public MBMelGan(String modulePath) {
         try {
-            mModule = ortEnv.createSession(modulePath);
+            OrtSession.SessionOptions sessionOptions = new OrtSession.SessionOptions();
+            sessionOptions.setIntraOpNumThreads(5);
+            sessionOptions.setInterOpNumThreads(5);
+            mModule = ortEnv.createSession(modulePath, sessionOptions);
             Map<String, NodeInfo> inputInfo = mModule.getInputInfo();
             for (Map.Entry<String, NodeInfo> entry : inputInfo.entrySet()) {
                 String inputName = entry.getKey();

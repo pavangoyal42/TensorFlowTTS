@@ -34,7 +34,8 @@ public class FastSpeech2 {
             // Load model and set number of threads
             OrtSession.SessionOptions sessionOptions = new OrtSession.SessionOptions();
             sessionOptions.setIntraOpNumThreads(5);
-            mModule = ortEnv.createSession(modulePath);
+            sessionOptions.setInterOpNumThreads(5);
+            mModule = ortEnv.createSession(modulePath, sessionOptions);
             Map<String, NodeInfo> inputInfo = mModule.getInputInfo();
             for (Map.Entry<String, NodeInfo> entry : inputInfo.entrySet()) {
                 String inputName = entry.getKey();
