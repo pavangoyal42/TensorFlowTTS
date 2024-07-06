@@ -8,8 +8,7 @@ import com.tensorspeech.tensorflowtts.module.MBMelGan;
 import com.tensorspeech.tensorflowtts.utils.Processor;
 import com.tensorspeech.tensorflowtts.utils.ThreadPoolManager;
 
-import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
-
+import java.nio.FloatBuffer;
 import java.util.Arrays;
 import java.util.concurrent.LinkedBlockingQueue;
 
@@ -82,9 +81,7 @@ class InputWorker {
                 long time = System.currentTimeMillis();
 
                 int[] inputIds = mProcessor.textToIds(sentence);
-
-                TensorBuffer output = mFastSpeech2.getMelSpectrogram(inputIds, SPEED);
-
+                FloatBuffer spectrogram = mFastSpeech2.getMelSpectrogram(inputIds, SPEED);
                 if (isInterrupt) {
                     Log.d(TAG, "proceed: interrupt");
                     return;
@@ -92,7 +89,7 @@ class InputWorker {
 
                 long encoderTime = System.currentTimeMillis();
 
-                float[] audioData = mMBMelGan.getAudio(output);
+                float[] audioData = mMBMelGan.getAudio(spectrogram);
 
                 if (isInterrupt) {
                     Log.d(TAG, "proceed: interrupt");

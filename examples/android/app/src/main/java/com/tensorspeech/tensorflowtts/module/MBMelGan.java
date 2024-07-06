@@ -2,42 +2,53 @@ package com.tensorspeech.tensorflowtts.module;
 
 import android.util.Log;
 
-import org.tensorflow.lite.Interpreter;
-import org.tensorflow.lite.Tensor;
-import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
-
-import java.io.File;
 import java.nio.FloatBuffer;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
+import ai.onnxruntime.NodeInfo;
+import ai.onnxruntime.OnnxTensor;
+import ai.onnxruntime.OnnxValue;
+import ai.onnxruntime.OrtEnvironment;
+import ai.onnxruntime.OrtSession;
+import ai.onnxruntime.TensorInfo;
 
 /**
  * @author {@link "mailto:xuefeng.ding@outlook.com" "Xuefeng Ding"}
  * Created 2020-07-20 17:26
  *
  */
-public class MBMelGan extends AbstractModule {
+public class MBMelGan {
     private static final String TAG = "MBMelGan";
-    private Interpreter mModule;
+    private OrtSession mModule;
+
+    private OrtEnvironment ortEnv = OrtEnvironment.getEnvironment();
 
     public MBMelGan(String modulePath) {
         try {
-            mModule = new Interpreter(new File(modulePath), getOption());
-            int input = mModule.getInputTensorCount();
-            for (int i = 0; i < input; i++) {
-                Tensor inputTensor = mModule.getInputTensor(i);
-                Log.d(TAG, "input:" + i
-                        + " name:" + inputTensor.name()
-                        + " shape:" + Arrays.toString(inputTensor.shape()) +
-                        " dtype:" + inputTensor.dataType());
+            OrtSession.SessionOptions sessionOptions = new OrtSession.SessionOptions();
+            sessionOptions.setIntraOpNumThreads(5);
+            sessionOptions.setInterOpNumThreads(5);
+            mModule = ortEnv.createSession(modulePath, sessionOptions);
+            Map<String, NodeInfo> inputInfo = mModule.getInputInfo();
+            for (Map.Entry<String, NodeInfo> entry : inputInfo.entrySet()) {
+                String inputName = entry.getKey();
+                TensorInfo tensorInfo = (TensorInfo)entry.getValue().getInfo();
+                Log.d(TAG, "input:"
+                        + " name:" + inputName
+                        + " shape:" + Arrays.toString(tensorInfo.getShape()) +
+                        " dtype:" + tensorInfo.onnxType.toString());
             }
-
-            int output = mModule.getOutputTensorCount();
-            for (int i = 0; i < output; i++) {
-                Tensor outputTensor = mModule.getOutputTensor(i);
-                Log.d(TAG, "output:" + i
-                        + " name:" + outputTensor.name()
-                        + " shape:" + Arrays.toString(outputTensor.shape())
-                        + " dtype:" + outputTensor.dataType());
+            Map<String, NodeInfo> outputInfo = mModule.getOutputInfo();
+            for (Map.Entry<String, NodeInfo> entry : outputInfo.entrySet()) {
+                String outputName = entry.getKey();
+                TensorInfo tensorInfo = (TensorInfo)entry.getValue().getInfo();
+                Log.d(TAG, "output:"
+                        + " name:" + outputName
+                        + " shape:" + Arrays.toString(tensorInfo.getShape()) +
+                        " dtype:" + tensorInfo.onnxType.toString());
             }
             Log.d(TAG, "successfully init");
         } catch (Exception e) {
@@ -45,20 +56,33 @@ public class MBMelGan extends AbstractModule {
         }
     }
 
-
-    public float[] getAudio(TensorBuffer input) {
-        mModule.resizeInput(0, input.getShape());
-        mModule.allocateTensors();
-
-        FloatBuffer outputBuffer = FloatBuffer.allocate(350000);
-
-        long time = System.currentTimeMillis();
-        mModule.run(input.getBuffer(), outputBuffer);
-        Log.d(TAG, "time cost: " + (System.currentTimeMillis() - time));
-
-        float[] audioArray = new float[outputBuffer.position()];
-        outputBuffer.rewind();
-        outputBuffer.get(audioArray);
-        return audioArray;
+    public float[] getAudio(FloatBuffer input) {
+        try {
+            Log.d(TAG, "getAudio start ");
+            Map<String, OnnxTensor> feed = new HashMap<>();
+            Log.d(TAG, "Input Position " + input.remaining());
+            long[] dims = new long[] {1, input.remaining()/80, 80};
+            OnnxTensor tensor = OnnxTensor.createTensor(ortEnv, input, dims);
+            Log.d(TAG, "tensor created ");
+            feed.put("mels", tensor);
+            OrtSession.Result result = mModule.run(feed, new OrtSession.RunOptions());
+            Log.d(TAG, "inference done ");
+            Optional<OnnxValue> onnxValue = result.get("Identity");
+            if (onnxValue.isPresent()) {
+                OnnxTensor onnxTensor = (OnnxTensor)onnxValue.get();
+                FloatBuffer outputBuffer = onnxTensor.getFloatBuffer();
+                float[] audioArray = new float[outputBuffer.remaining()];
+                outputBuffer.get(audioArray);
+                Log.d(TAG, "OnnxValue Is Present ");
+                return audioArray;
+            } else {
+                Log.d(TAG, "OnnxValue Is not Present ");
+                return null;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Log.d(TAG, "OnnxValue Exception");
+            return null;
+        }
     }
 }
